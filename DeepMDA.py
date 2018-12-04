@@ -48,11 +48,15 @@ def prepare_data(seperate=False):
     #miRNA_fea = np.loadtxt("circRNA_functional_sim.txt",dtype=float,delimiter=",")
     #miRNA_fea = np.loadtxt("miRNA_sim2.txt",dtype=float,delimiter=",")
     #miRNA_fea = np.loadtxt("miRNA_sim_add_target_new.txt",dtype=float,delimiter=",")
+#mirna相似性矩阵
     miRNA_fea = np.loadtxt("miRNA_sim_short.txt",dtype=float,delimiter=",")
+#疾病语义相似性矩阵
     disease_fea = np.loadtxt("disease_large_sim.txt",dtype=float,delimiter=",")
     #interaction = np.loadtxt("miRNA_disease_matrix2.txt",dtype=int,delimiter=" ")
+#mirna-疾病关系矩阵：0，1
     interaction = np.loadtxt("miRNA_disease_interaction_short.txt",dtype=int,delimiter=",")
     #disease_fea2 = np.loadtxt("disease_sim_integrate_chose_one.txt",dtype=float,delimiter=",")
+#基因-疾病关系矩阵：0，1
     disease_fea2 = np.loadtxt("disease_sim_integrate_add_lnc_gene.txt",dtype=float,delimiter=",")
     
     link_number = 0
@@ -60,9 +64,13 @@ def prepare_data(seperate=False):
     label = []
     link_position = []
     nonLinksPosition = []  # all non-link position^M
+#i是mirna，j是疾病
     for i in range(0, interaction.shape[0]):
         for j in range(0, interaction.shape[1]):
+#将mirna与疾病关系矩阵转为行向量
             label.append(interaction[i,j])
+#如果mirna-疾病有关系，将第i个mirna与其他minna是否有关的行向量放入mirna_fea_tmp矩阵中
+#将第j个疾病的语义相似性矩阵与疾病-基因矩阵的行向量相加
             if interaction[i, j] == 1:
                 link_number = link_number + 1
                 link_position.append([i, j])
@@ -187,6 +195,7 @@ def DeepMDA():
     X_data1, X_data2 = transfer_array_format(X) # X X_new
     print X_data1.shape,X_data2.shape
     y, encoder = preprocess_labels(labels)# labels labels_new
+#num是步长为y的矩阵，y是类别数
     num = np.arange(len(y))
     np.random.shuffle(num)
     X_data1 = X_data1[num]
@@ -208,6 +217,7 @@ def DeepMDA():
     all_prob[2] = []
     all_prob[3] = []
     all_averrage = []
+#五折交叉验证
     for fold in range(num_cross_val):
         train1 = np.array([x for i, x in enumerate(X_data1) if i % num_cross_val != fold])
         test1 = np.array([x for i, x in enumerate(X_data1) if i % num_cross_val == fold])
@@ -234,6 +244,7 @@ def DeepMDA():
         
         class_index = 0
         #prefilter_train, prefilter_test, prefilter_train_bef, prefilter_test_bef = autoencoder_two_subnetwork_fine_tuning(train1, train2, train_label, test1, test2, test_label)
+#特征向量fine-turning->编码器
         prefilter_train_bef, prefilter_test_bef = autoencoder_two_subnetwork_fine_tuning(train1, train2, train_label, test1, test2, test_label)
         #X_train1_tmp, X_test1_tmp, X_train2_tmp, X_test2_tmp, model = autoencoder_two_subnetwork_fine_tuning(train1, train2, train_label, test1, test2, test_label)
         #model = autoencoder_two_subnetwork_fine_tuning(train1, train2, train_label, test1, test2, test_label)
@@ -251,6 +262,8 @@ def DeepMDA():
 
         tmp_aver = [0] * len(real_labels)
         print 'deep autoencoder'
+#--------------使用fine tunning---------------
+#随机森林分类器
         clf = RandomForestClassifier(n_estimators=50)
         clf.fit(prefilter_train_bef, train_label_new)
         ae_y_pred_prob = clf.predict_proba(prefilter_test_bef)[:,1]
@@ -270,6 +283,7 @@ def DeepMDA():
 		all_performance.append([acc, precision, sensitivity, specificity, MCC, auc_score, aupr_score])
 
 		print 'deep autoencoder without fine tunning'
+#---------------without fine tunning-----------------
         class_index = class_index + 1
         clf = RandomForestClassifier(n_estimators=50)
         clf.fit(prefilter_train_bef, train_label_new)
@@ -288,6 +302,7 @@ def DeepMDA():
         all_performance_bef.append([acc, precision, sensitivity, specificity, MCC, auc_score, aupr_score])
 
 		print 'random forest using raw feature'
+#----------------raw feature-----------------
         class_index = class_index + 1
         prefilter_train = np.concatenate((train1, train2), axis = 1)
         prefilter_test = np.concatenate((test1, test2), axis = 1)
@@ -330,7 +345,7 @@ def DeepMDA():
         aupr_score = auc(recall, precision1)
         #scipy.io.savemat('raw_aupr',{'recall':recall,'precision':precision1,'aupr_score':aupr_score})
         print "RF :", acc, precision, sensitivity, specificity, MCC, auc_score, aupr_score
-
+#-------------以上是自动编码器---------------------
         ## DNN 
         class_index = class_index + 1
         prefilter_train = np.concatenate((train1, train2), axis = 1)
